@@ -2,6 +2,7 @@
 
 import { reqBoxSearchSchema } from '@/models/RequestModels';
 import NodeCache from 'node-cache';
+import iso3166 from 'iso-3166-1';
 
 const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 }); // Cache results for 1 hour, cleanup every 10 minutes
 const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -9,9 +10,9 @@ const searchUrl = new URL('https://maps.googleapis.com/maps/api/place/textsearch
 const detailsUrl = new URL('https://maps.googleapis.com/maps/api/place/details/json');
 
 /**
- * Parses an address using Libpostal.
+ * Parses an address using the Google Geocoding API.
  * @param {string} address - The full address string.
- * @returns {Object} - Parsed components (city, state, postal code, country, etc.).
+ * @returns {Object} - Parsed components (city, state, postal code, country, countryCode, etc.).
  */
 async function parseAddress(address) {
   const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
@@ -25,13 +26,14 @@ async function parseAddress(address) {
     }
 
     const components = data.results[0].address_components;
-     let street = "",
+    let street = "",
       streetNumber = "",
       city = "",
       county = "",
       state = "",
       postalCode = "",
-      country = "";
+      country = "",
+      countryCode = "";
 
     components.forEach((component) => {
       if (component.types.includes("street_number")) {
@@ -54,23 +56,27 @@ async function parseAddress(address) {
       }
       if (component.types.includes("country")) {
         country = component.long_name;
+        
+        // Use the iso-3166-1 library to derive the ISO country code (alpha-2)
+        const countryData = iso3166.whereCountry(country);
+        countryCode = countryData ? countryData.alpha2 : "";
       }
     });
 
     return {
       street: streetNumber ? `${streetNumber} ${street}` : street,
       city,
-      county, 
+      county,
       state,
       postalCode,
       country,
+      countryCode, // Derived ISO 3166-1 alpha-2 country code
     };
   } catch (error) {
     console.error("Error parsing address:", error);
     return null;
   }
 }
-
 
 /**
  * Fetches additional details for a place using Google Places Details API.
@@ -139,7 +145,7 @@ async function fetchGooglePlaces(searchQuery) {
     // Process API response
     const googleResults = await Promise.all(
       (data.results || []).map(async (place) => {
-        const { city, state, country } = await parseAddress(place.formatted_address);
+        const { city, state, country, countryCode } = await parseAddress(place.formatted_address);
         const additionalDetails = await fetchPlaceDetails(place.place_id);
 
         return {
@@ -151,9 +157,10 @@ async function fetchGooglePlaces(searchQuery) {
           rating: place.rating,
           totalRatings: place.user_ratings_total,
           address: place.formatted_address || '',
-          city: city,
-          state: state,
-          country: country,
+          city,
+          state,
+          country,
+          countryCode, // ISO country code added here
           phone: additionalDetails.phone,
           website: additionalDetails.website,
           contactName: '', // Placeholder, requires manual entry

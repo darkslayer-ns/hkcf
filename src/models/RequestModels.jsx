@@ -73,6 +73,7 @@ export const reqNewBoxSchema = async (input) => {
     return await schema.parseAsync(input);
   } catch (error) {
     console.error('Box validation error:', error.errors);
+    console.error(input)
     throw new Error('Invalid box data. Please check your input.');
   }
 };
