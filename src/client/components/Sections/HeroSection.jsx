@@ -13,10 +13,10 @@ export default function HeroSection() {
       <div className="relative z-10 container mx-auto px-6 py-10 md:py-20">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-black uppercase mb-6 tracking-wide">
-            {title || 'Global Hell Raisers'}
+            {title}
           </h1>
           <p className="text-lg md:text-xl text-gray-300 mb-8">
-            {subtitle || 'See who else from your box is a Global Hell Raiser!'}
+            {subtitle}
           </p>
           
           <div className="bg-gradient-to-b from-black/60 to-black/90 backdrop-blur-sm border-2 border-cfhk-red/50 rounded-lg p-6 md:p-8 w-full max-w-xl mx-auto shadow-lg">

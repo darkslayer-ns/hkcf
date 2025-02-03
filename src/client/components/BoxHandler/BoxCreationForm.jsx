@@ -21,7 +21,7 @@ const Steps = Object.freeze({
 
 const BoxCreationForm = ({ searchQuery, onSubmit, onCancel }) => {
   const { setTitle, setSubtitle } = useGlobal();
-  
+
   const [step, setStep] = useState(Steps.ESSENTIAL);
   const [boxName, setBoxName] = useState(searchQuery || '');
   const [suggestedBoxes, setSuggestedBoxes] = useState([]);
