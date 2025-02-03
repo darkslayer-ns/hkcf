@@ -1,5 +1,3 @@
-'use server';
-
 import { z } from 'zod';
 
 /* ==============================
@@ -86,17 +84,11 @@ export const reqNewBoxSchema = async (input) => {
  */
 export const reqNewHailraiserSchema = async (input) => {
   const schema = z.object({
-    boxname: safeObjectId,
-    address: safeString.optional(),
-    city: safeString.max(50, "City name cannot exceed 50 characters"),
-    state: safeString.max(50, "State name cannot exceed 50 characters").optional(),
+    boxname: safeObjectId.optional().nullable(),
+    firstName: safeString.max(50, "City name cannot exceed 50 characters"),
+    lastName: safeString.max(50, "City name cannot exceed 50 characters"),
     country: safeString.max(50, "Country name cannot exceed 50 characters"),
-    phone: safePhone,
-    website: safeURL,
-    contactName: safeString.optional(),
-    contactEmail: safeEmail,
-    hellraiserName: safeString.max(100, "Hellraiser name cannot exceed 100 characters"),
-    hellraiserEmail: safeEmail,
+    eMail: safeEmail.optional(),
     approved: z.boolean().default(false),
     submittedBy: z.enum(["Tablet", "Webform"]),
     submissionTimestamp: z.date().default(() => new Date()),

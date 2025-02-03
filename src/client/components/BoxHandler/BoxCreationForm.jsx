@@ -4,6 +4,7 @@ import { MapPin, PlusCircle, ChevronRight } from 'lucide-react';
 import Flag from 'react-world-flags';
 import useDebounce from '@/client/hooks/useDebounce';
 import ProgressBar from '@/client/components/UX/ProgressBar';
+
 import { useGlobal } from '@/app/contexts/GlobalContext';
 import { reqNewBoxSchema } from '@/models/RequestModels';
 
@@ -15,10 +16,9 @@ const Steps = Object.freeze({
   ESSENTIAL: 'Box Location',
   CONTACT_INFO: 'Box Contact',
   CONTACT_PERSON: 'Owner Contact',
-  SUCCESS: 'Success'
 });
 
-const stepsList = [Steps.ESSENTIAL, Steps.CONTACT_INFO, Steps.CONTACT_PERSON, Steps.SUCCESS];
+const stepsList = [Steps.ESSENTIAL, Steps.CONTACT_INFO, Steps.CONTACT_PERSON];
 
 // Returns a title for the current step (can be customized further)
 const getStepTitle = (step) => {
@@ -29,15 +29,13 @@ const getStepTitle = (step) => {
       return 'Add Contact Info';
     case Steps.CONTACT_PERSON:
       return 'Add Contact Person';
-    case Steps.SUCCESS:
-      return 'Box Created';
     default:
       return '';
   }
 };
 
 const BoxCreationForm = ({ searchQuery, onSubmit, onCancel }) => {
-  const { setTitle, setSubtitle } = useGlobal();
+  const { setTitle, setSubtitle, hellRaiser } = useGlobal();
   const [step, setStep] = useState(Steps.ESSENTIAL);
   const [inputChanged, setInputChanged] = useState(false);
   const [suggestedBoxes, setSuggestedBoxes] = useState([]);
@@ -64,6 +62,7 @@ const BoxCreationForm = ({ searchQuery, onSubmit, onCancel }) => {
     contactName: '',
     contactEmail: ''
   });
+
 
   // Debounce the name field to reduce unnecessary API calls.
   const debouncedName = useDebounce(formData.name, 300);
@@ -183,6 +182,7 @@ const BoxCreationForm = ({ searchQuery, onSubmit, onCancel }) => {
       };
 
       await onSubmit(boxData);
+      setSubtitle(null);
       setStep(Steps.SUCCESS);
     } catch (error) {
       setError(error.message);
@@ -354,15 +354,6 @@ const BoxCreationForm = ({ searchQuery, onSubmit, onCancel }) => {
               />
             </div>
           </>
-        );
-
-      case Steps.SUCCESS:
-        return (
-          <div className="text-center py-8">
-            <h3 className="text-xl sm:text-2xl font-bold text-green-500 mb-4">
-              Awesome! Your CrossFit box is now listed.
-            </h3>
-          </div>
         );
 
       default:

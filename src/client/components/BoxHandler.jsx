@@ -6,46 +6,52 @@ import BoxCreationForm from './BoxHandler/BoxCreationForm';
 import AddMemberForm from './BoxHandler/AddMemberForm';
 import SuccessMessage from './BoxHandler/SuccessMessage';
 
-import { searchBoxesMongo } from '@/ssr/db/searchBoxes'
+import { searchBoxesMongo } from '@/ssr/db/searchBoxes';
+
 import useDebounce from '@/client/hooks/useDebounce';
+import { useGlobal } from '@/app/contexts/GlobalContext';
 
 /**
  * Step constants for different UI states
  */
-const Steps = Object.freeze({
-  INITIAL: 'initial', // Search input field
-  ADD_NEW_BOX: 'addNewBox', // Box creation form
-  ADD_ME: 'addMe', // Add user to existing box
-  SUCCESS: 'success', // Success message after joining
+export const Steps = Object.freeze({
+  SEARCH: 'search',            // Step 1: Search for a Box
+  ADD_HAILRAISER: 'addHailRaiser', // Step 2: Capture Hell Raiser Name & Email (if no box found)
+  CREATE_BOX: 'createBox',      // Step 3: Create a new Box
+  JOIN_BOX: 'joinBox',          // Step 4: Add user to existing Box
+  SUCCESS: 'success',           // Step 5: Success message after joining or creating
+  EXIT: 'exit'                  // Exit if user chooses not to continue
 });
 
 /**
  * BoxHandler Component
- * Manages the user flow for searching, creating, and joining a box.
- *
- * @param {Object} props - Component properties.
- * @param {function} props.onBoxSelected - Callback when a box is selected.
- * @param {function} props.onBoxCreated - Callback when a new box is created.
- * @param {function} props.onMemberAdded - Callback when a user joins a box.
+ * Manages the user flow for searching for a box, joining a box, or creating a new box.
  */
 const BoxHandler = ({
   onBoxSelected = (box) => console.log('Box selected:', box),
   onBoxCreated = (box) => console.log('Box created:', box),
   onMemberAdded = (member) => console.log('Member added:', member),
+  onExit = () => console.log('User exited workflow'),
 }) => {
-  const [step, setStep] = useState(Steps.INITIAL); // Tracks the current UI step
-  const [searchQuery, setSearchQuery] = useState(''); // Stores the user's search query
-  const [filteredBoxes, setFilteredBoxes] = useState([]); // Stores search results
-  const [selectedBox, setSelectedBox] = useState(null); // Stores the selected box
-  const dropdownRef = useRef(null); // Ref for dropdown handling
+  const {
+    selectedBox, setSelectedBox,
+    boxHandlerStep, setBoxHandlerStep
+  } = useGlobal();
 
-  // Apply debounce before triggering search to optimize API calls
+  // Set default step on mount (using useEffect to avoid updating state during render)
+  useEffect(() => {
+    setBoxHandlerStep(Steps.SEARCH);
+  }, [setBoxHandlerStep]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredBoxes, setFilteredBoxes] = useState([]);
+
+  const [hailRaiser, setHailRaiser] = useState({ name: '', email: '' });
+  const dropdownRef = useRef(null);
+
+  // Apply debounce to optimize API calls
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  /**
-   * Effect: Triggers search when the debounced query changes.
-   * Ensures search is performed only when the user stops typing for 300ms.
-   */
   useEffect(() => {
     const performSearch = async () => {
       const formData = new FormData();
@@ -53,14 +59,13 @@ const BoxHandler = ({
 
       try {
         const result = await searchBoxesMongo(formData);
-        setFilteredBoxes(result.googleResults || [])
+        setFilteredBoxes(result.googleResults || []);
       } catch (error) {
         console.error('Search error:', error);
-        setFilteredBoxes([]); // Clears results on error
+        setFilteredBoxes([]);
       }
     };
 
-    // Only search if the query is at least 3 characters long
     if (debouncedSearchQuery.trim().length > 2) {
       performSearch();
     } else {
@@ -68,68 +73,125 @@ const BoxHandler = ({
     }
   }, [debouncedSearchQuery]);
 
-  /**
-   * Effect: Closes the dropdown when clicking outside.
-   */
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        // Optionally, close the dropdown here if needed
+        // Optional: Close dropdown here if needed
       }
     };
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   /**
-   * Handles box selection.
-   * @param {Object} box - The selected box object.
+   * Handles the selection of a box from search results
    */
   const handleBoxSelect = (box) => {
     setSelectedBox(box);
     setSearchQuery(box.name);
-    setStep(Steps.ADD_ME);
-    onBoxSelected(box); 
+    setBoxHandlerStep(Steps.JOIN_BOX);
+    onBoxSelected(box);
+  };
+
+  /**
+   * Handles the case when no matching box is found
+   */
+  const handleNoBoxFound = () => {
+    setBoxHandlerStep(Steps.ADD_HAILRAISER);
+  };
+
+  /**
+   * Handles capturing the Hell Raiser details before creating a new box
+   */
+  const handleHailRaiserSubmit = (memberDetails) => {
+    setHailRaiser(memberDetails);
+    setBoxHandlerStep(Steps.CREATE_BOX);
+  };
+
+  /**
+   * Handles creating a new box
+   */
+  const handleCreateBox = (newBox) => {
+    onBoxCreated({ ...newBox, members: [hailRaiser] });
+    setBoxHandlerStep(Steps.SUCCESS);
+  };
+
+  /**
+   * Reset to initial state
+   */
+  const handleReset = () => {
+    setBoxHandlerStep(Steps.SEARCH);
+    setSearchQuery('');
+    setSelectedBox(null);
+    setHailRaiser({ name: '', email: '' });
+  };
+
+  /**
+   * Handles user choosing not to continue
+   */
+  const handleExit = () => {
+    setBoxHandlerStep(Steps.EXIT);
+    onExit();
   };
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Search Box Input */}
-      {step === Steps.INITIAL && (
+      {/* Step 1: Search for a Box */}
+      {boxHandlerStep === Steps.SEARCH && (
         <BoxSearchInput
           searchQuery={searchQuery}
-          setSearchQuery={(query) => {
-            setSearchQuery(query);
-            setStep(Steps.INITIAL); // Reset to search state
-          }}
+          setSearchQuery={setSearchQuery}
           filteredBoxes={filteredBoxes}
           onBoxSelect={handleBoxSelect}
-          onAddNewBox={() => setStep(Steps.ADD_NEW_BOX)}
+          onAddNewBox={handleNoBoxFound}
+          showCreateOption={debouncedSearchQuery.trim().length > 2 && filteredBoxes.length === 0}
         />
       )}
 
-      {/* Box Creation Form */}
-      {step === Steps.ADD_NEW_BOX && (
+      {/* Step 2: Add Hell Raiser Name & Email - Shown only if no box found */}
+      {boxHandlerStep === Steps.ADD_HAILRAISER && (
+        <AddMemberForm
+          boxName="New Box"
+          onSubmit={handleHailRaiserSubmit}
+          onCancel={handleExit}
+        />
+      )}
+
+      {/* Step 3: Box Creation Form - Shown when no matching box found */}
+      {boxHandlerStep === Steps.CREATE_BOX && (
         <BoxCreationForm
           searchQuery={searchQuery}
-          onSubmit={() => {}}
-          onCancel={() => setStep(Steps.INITIAL)}
+          onSubmit={handleCreateBox}
+          onCancel={handleReset}
         />
       )}
 
-      {/* Add Member Form (when selecting an existing box) */}
-      {step === Steps.ADD_ME && selectedBox && (
+      {/* Step 4: Add Member Form - Shown when existing box selected */}
+      {boxHandlerStep === Steps.JOIN_BOX && selectedBox && (
         <AddMemberForm
           boxName={selectedBox.name}
-          onSubmit={() => {}}
-          onCancel={() => setStep(Steps.INITIAL)}
+          onSubmit={(memberDetails) => {
+            onMemberAdded({ ...memberDetails, box: selectedBox.name });
+            setBoxHandlerStep(Steps.SUCCESS);
+          }}
+          onCancel={handleReset}
         />
       )}
 
-      {/* Success Message after joining a box */}
-      {step === Steps.SUCCESS && selectedBox && (
-        <SuccessMessage boxName={selectedBox.name} onReset={() => setStep(Steps.INITIAL)} />
+      {/* Step 5: Success Message */}
+      {boxHandlerStep === Steps.SUCCESS && (
+        <SuccessMessage
+          boxName={selectedBox.name}
+          onReset={handleReset}
+        />
+      )}
+
+      {/* Exit Workflow */}
+      {boxHandlerStep === Steps.EXIT && (
+        <div className="text-center p-4">
+          <p>Thank you! Returning to the main page...</p>
+        </div>
       )}
     </div>
   );

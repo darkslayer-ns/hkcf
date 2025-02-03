@@ -10,6 +10,15 @@ export function GlobalProvider({ children }) {
   const [title, setTitle] = useState(DEFAULT_TITLE);
   const [subtitle, setSubtitle] = useState(DEFAULT_SUBTITLE);
 
+  // Hell Raiser details (starts null, will be set later)
+  const [boxHandlerStep, setBoxHandlerStep] = useState(null);
+
+  // Hell Raiser details (starts null, will be set later)
+  const [hellRaiser, setHellRaiser] = useState(null);
+
+  // Selected Box (starts null, set when user selects a box)
+  const [selectedBox, setSelectedBox] = useState(null);
+
   // Refs to prevent unnecessary updates
   const hasSetTitle = useRef(false);
   const hasSetSubtitle = useRef(false);
@@ -29,7 +38,13 @@ export function GlobalProvider({ children }) {
   }, [subtitle]);
 
   return (
-    <GlobalContext.Provider value={{ title, setTitle, subtitle, setSubtitle }}>
+    <GlobalContext.Provider value={{ 
+      title, setTitle, 
+      subtitle, setSubtitle, 
+      boxHandlerStep, setBoxHandlerStep,
+      hellRaiser, setHellRaiser, 
+      selectedBox, setSelectedBox
+    }}>
       {children}
     </GlobalContext.Provider>
   );
