@@ -14,7 +14,7 @@ import { useGlobal } from '@/app/contexts/GlobalContext';
 /**
  * Step constants for different UI states
  */
-export const Steps = Object.freeze({
+export const HandlerSteps = Object.freeze({
   SEARCH: 'search',            // Step 1: Search for a Box
   ADD_HAILRAISER: 'addHailRaiser', // Step 2: Capture Hell Raiser Name & Email (if no box found)
   CREATE_BOX: 'createBox',      // Step 3: Create a new Box
@@ -40,7 +40,7 @@ const BoxHandler = ({
 
   // Set default step on mount (using useEffect to avoid updating state during render)
   useEffect(() => {
-    setBoxHandlerStep(Steps.SEARCH);
+    setBoxHandlerStep(HandlerSteps.SEARCH);
   }, [setBoxHandlerStep]);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,7 +90,7 @@ const BoxHandler = ({
   const handleBoxSelect = (box) => {
     setSelectedBox(box);
     setSearchQuery(box.name);
-    setBoxHandlerStep(Steps.JOIN_BOX);
+    setBoxHandlerStep(HandlerSteps.JOIN_BOX);
     onBoxSelected(box);
   };
 
@@ -98,7 +98,7 @@ const BoxHandler = ({
    * Handles the case when no matching box is found
    */
   const handleNoBoxFound = () => {
-    setBoxHandlerStep(Steps.ADD_HAILRAISER);
+    setBoxHandlerStep(HandlerSteps.ADD_HAILRAISER);
   };
 
   /**
@@ -106,7 +106,7 @@ const BoxHandler = ({
    */
   const handleHailRaiserSubmit = (memberDetails) => {
     setHailRaiser(memberDetails);
-    setBoxHandlerStep(Steps.CREATE_BOX);
+    //setBoxHandlerStep(HandlerSteps.CREATE_BOX);
   };
 
   /**
@@ -114,14 +114,15 @@ const BoxHandler = ({
    */
   const handleCreateBox = (newBox) => {
     onBoxCreated({ ...newBox, members: [hailRaiser] });
-    setBoxHandlerStep(Steps.SUCCESS);
+    setBoxHandlerStep(HandlerSteps.SUCCESS);
+    console.log(selectedBox);
   };
 
   /**
    * Reset to initial state
    */
   const handleReset = () => {
-    setBoxHandlerStep(Steps.SEARCH);
+    setBoxHandlerStep(HandlerSteps.SEARCH);
     setSearchQuery('');
     setSelectedBox(null);
     setHailRaiser({ name: '', email: '' });
@@ -131,14 +132,24 @@ const BoxHandler = ({
    * Handles user choosing not to continue
    */
   const handleExit = () => {
-    setBoxHandlerStep(Steps.EXIT);
+    setBoxHandlerStep(HandlerSteps.EXIT);
     onExit();
   };
+
+  // When in EXIT state, return to SEARCH step after 5 seconds.
+  useEffect(() => {
+    if (boxHandlerStep === HandlerSteps.EXIT) {
+      const timer = setTimeout(() => {
+        handleReset();
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [boxHandlerStep]);
 
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Step 1: Search for a Box */}
-      {boxHandlerStep === Steps.SEARCH && (
+      {boxHandlerStep === HandlerSteps.SEARCH && (
         <BoxSearchInput
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
@@ -150,7 +161,7 @@ const BoxHandler = ({
       )}
 
       {/* Step 2: Add Hell Raiser Name & Email - Shown only if no box found */}
-      {boxHandlerStep === Steps.ADD_HAILRAISER && (
+      {boxHandlerStep === HandlerSteps.ADD_HAILRAISER && (
         <AddMemberForm
           boxName="New Box"
           onSubmit={handleHailRaiserSubmit}
@@ -159,7 +170,7 @@ const BoxHandler = ({
       )}
 
       {/* Step 3: Box Creation Form - Shown when no matching box found */}
-      {boxHandlerStep === Steps.CREATE_BOX && (
+      {boxHandlerStep === HandlerSteps.CREATE_BOX && (
         <BoxCreationForm
           searchQuery={searchQuery}
           onSubmit={handleCreateBox}
@@ -168,19 +179,19 @@ const BoxHandler = ({
       )}
 
       {/* Step 4: Add Member Form - Shown when existing box selected */}
-      {boxHandlerStep === Steps.JOIN_BOX && selectedBox && (
+      {boxHandlerStep === HandlerSteps.JOIN_BOX && selectedBox && (
         <AddMemberForm
           boxName={selectedBox.name}
           onSubmit={(memberDetails) => {
             onMemberAdded({ ...memberDetails, box: selectedBox.name });
-            setBoxHandlerStep(Steps.SUCCESS);
+            setBoxHandlerStep(HandlerSteps.SUCCESS);
           }}
           onCancel={handleReset}
         />
       )}
 
       {/* Step 5: Success Message */}
-      {boxHandlerStep === Steps.SUCCESS && (
+      {boxHandlerStep === HandlerSteps.SUCCESS && (
         <SuccessMessage
           boxName={selectedBox.name}
           onReset={handleReset}
@@ -188,7 +199,7 @@ const BoxHandler = ({
       )}
 
       {/* Exit Workflow */}
-      {boxHandlerStep === Steps.EXIT && (
+      {boxHandlerStep === HandlerSteps.EXIT && (
         <div className="text-center p-4">
           <p>Thank you! Returning to the main page...</p>
         </div>

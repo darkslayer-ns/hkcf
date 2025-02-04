@@ -8,34 +8,56 @@ import { z } from 'zod';
  * Base string validation pattern
  * Ensures strings are non-empty, within length limits, and contain safe characters
  */
-const safeString = z.string()
-  .min(1, "Field is required")
-  .max(255, "Field cannot exceed 255 characters")
-  .regex(/^[a-zA-Z0-9\s.,'-]+$/, "Invalid characters detected");
+const safeString = z.union([
+  z.string()
+    .min(0) // Allows empty string
+    .max(255, "Field cannot exceed 255 characters")
+    .regex(/^[\p{L}0-9\s.,'"|\-]*$/u, "Invalid characters detected"),
+  z.literal(""), // Explicitly allow empty string (optional, as it's already allowed)
+  z.null()       // Explicitly allow null
+]).optional();
+
+
+
 
 /**
  * Email validation pattern
  * Ensures email addresses follow standard format
  */
-const safeEmail = z.string()
-  .regex(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, "Invalid email format")
+const safeEmail = z
+  .union([
+    z.string().regex(
+      /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+      "Invalid email format"
+    ),
+    z.literal(""),  // Allow an empty string
+    z.null()        // Allow null
+  ])
   .optional();
+
 
 /**
  * Phone number validation pattern
  * Allows digits, spaces, hyphens, parentheses, and plus signs
  */
-const safePhone = z.string()
-  .regex(/^[\d\s\-()+]+$/, "Invalid phone number")
-  .optional();
+const safePhone = z.union([
+  z.string()
+    .regex(/^[\d\s\-()+]+$/, "Invalid phone number"),
+  z.literal(""), // Explicitly allow an empty string
+  z.null()       // Explicitly allow null
+]).optional();
 
 /**
  * URL validation pattern
  * Ensures URLs follow standard format with optional protocol
  */
-const safeURL = z.string()
-  .regex(/^(https?:\/\/)?([a-zA-Z0-9.-]+)\.([a-zA-Z]{2,})(\/\S*)?$/, "Invalid website URL")
-  .optional();
+const safeURL = z.union([
+  z.string()
+    .regex(/^(https?:\/\/)?([a-zA-Z0-9.-]+)\.([a-zA-Z]{2,})(\/\S*)?$/, "Invalid website URL"),
+  z.literal(""), // Allow an empty string explicitly
+  z.null()       // Allow null explicitly
+]).optional();
+
 
 /**
  * MongoDB ObjectId validation pattern
@@ -56,15 +78,15 @@ const safeObjectId = z.string()
  */
 export const reqNewBoxSchema = async (input) => {
   const schema = z.object({
-    name: safeString.max(100, "Box name cannot exceed 100 characters"),
-    location: safeString.optional(),
-    city: safeString.max(50, "City name cannot exceed 50 characters"),
-    state: safeString.max(50, "State name cannot exceed 50 characters").optional(),
-    country: safeString.max(50, "Country name cannot exceed 50 characters"),
+    name: safeString,
+    location: safeString,
+    city: safeString,
+    state: safeString,
+    country: safeString,
     lat: z.number().optional(),
     lng: z.number().optional(),
-    contactName: safeString.optional(),
-    contactEmail: safeEmail,
+    contactName: safeString,
+    contactEmail: safeEmail
   });
 
   try {
@@ -85,9 +107,9 @@ export const reqNewBoxSchema = async (input) => {
 export const reqNewHailraiserSchema = async (input) => {
   const schema = z.object({
     boxname: safeObjectId.optional().nullable(),
-    firstName: safeString.max(50, "City name cannot exceed 50 characters"),
-    lastName: safeString.max(50, "City name cannot exceed 50 characters"),
-    country: safeString.max(50, "Country name cannot exceed 50 characters"),
+    firstName: safeString,
+    lastName: safeString,
+    country: safeString,
     eMail: safeEmail.optional(),
     approved: z.boolean().default(false),
     submittedBy: z.enum(["Tablet", "Webform"]),

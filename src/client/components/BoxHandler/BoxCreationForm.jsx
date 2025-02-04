@@ -1,26 +1,36 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { searchBoxesGoogle } from '@/ssr/Google/searchBoxes';
-import { MapPin, PlusCircle, ChevronRight } from 'lucide-react';
-import Flag from 'react-world-flags';
-import useDebounce from '@/client/hooks/useDebounce';
+import { ChevronRight } from 'lucide-react';
+
+// Importing step components
+import EssentialStep from '@/client/components/BoxCreationSteps/EssentialStep';
+import ContactInfoStep from '@/client/components/BoxCreationSteps/ContactInfoStep';
+import ContactPersonStep from '@/client/components/BoxCreationSteps/ContactPersonStep';
+
+// Importing the progress bar component
 import ProgressBar from '@/client/components/UX/ProgressBar';
 
+import useDebounce from '@/client/hooks/useDebounce';
 import { useGlobal } from '@/app/contexts/GlobalContext';
 import { reqNewBoxSchema } from '@/models/RequestModels';
+import { HandlerSteps } from '../BoxHandler';
 
-// Fields that users are allowed to edit manually
-const editableFields = ['name', 'phone', 'website', 'contactName', 'contactEmail', 'address'];
-
-// Define the steps for the multi‑step form including a final success step.
+// Define the available steps as constants for readability
 const Steps = Object.freeze({
   ESSENTIAL: 'Box Location',
   CONTACT_INFO: 'Box Contact',
   CONTACT_PERSON: 'Owner Contact',
 });
 
+// Define the order of steps in the multi-step form
 const stepsList = [Steps.ESSENTIAL, Steps.CONTACT_INFO, Steps.CONTACT_PERSON];
 
-// Returns a title for the current step (can be customized further)
+/**
+ * Returns the title string corresponding to the provided step.
+ *
+ * @param {string} step - The current step identifier.
+ * @returns {string} The title for the step.
+ */
 const getStepTitle = (step) => {
   switch (step) {
     case Steps.ESSENTIAL:
@@ -34,16 +44,29 @@ const getStepTitle = (step) => {
   }
 };
 
-const BoxCreationForm = ({ searchQuery, onSubmit, onCancel }) => {
-  const { setTitle, setSubtitle, hellRaiser } = useGlobal();
+/**
+ * BoxCreationForm component handles a multi-step form process to create a new box.
+ *
+ * @param {Object} props - Component props.
+ * @param {string} props.searchQuery - Initial search query to pre-populate the form.
+ * @param {Function} props.onCancel - Function to handle form cancellation.
+ * @returns {JSX.Element} The rendered BoxCreationForm component.
+ */
+const BoxCreationForm = ({ searchQuery, onCancel }) => {
+  // Global state setters from context
+  const { setSubtitle, setSelectedBox, setBoxHandlerStep } = useGlobal();
+
+  // Local state variables for form step, input changes, suggestions, dropdown visibility, and errors
   const [step, setStep] = useState(Steps.ESSENTIAL);
   const [inputChanged, setInputChanged] = useState(false);
   const [suggestedBoxes, setSuggestedBoxes] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [error, setError] = useState('');
+
+  // Ref for the dropdown element to detect clicks outside of it
   const dropdownRef = useRef(null);
 
-  // Our complete form data – when a box is selected the fields are populated
+  // Local state for form data
   const [formData, setFormData] = useState({
     id: '',
     name: searchQuery || '',
@@ -63,26 +86,36 @@ const BoxCreationForm = ({ searchQuery, onSubmit, onCancel }) => {
     contactEmail: ''
   });
 
-
-  // Debounce the name field to reduce unnecessary API calls.
+  // Debounce the name input to reduce the frequency of API calls
   const debouncedName = useDebounce(formData.name, 300);
 
-  // If searchQuery is passed in, auto‑search and select the first result.
+  /**
+   * useEffect to fetch initial box data if a searchQuery is provided.
+   * The first result from the API call is selected.
+   */
   useEffect(() => {
     if (searchQuery) {
-      const fd = new FormData();
-      fd.append('query', searchQuery);
-      searchBoxesGoogle(fd)
-        .then(result => {
+      const fetchBox = async () => {
+        const fd = new FormData();
+        fd.append('query', searchQuery);
+        try {
+          const result = await searchBoxesGoogle(fd);
           if (result.googleResults?.length) {
             handleBoxSelect(result.googleResults[0]);
           }
-        })
-        .catch(err => console.error(err));
+        } catch (err) {
+          console.error(err);
+        }
+      };
+      fetchBox();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
-  // Fetch suggestions when the debounced name changes.
+  /**
+   * useEffect to fetch box suggestions when the debounced name changes.
+   * Suggestions are only fetched when the input has been changed and is longer than 2 characters.
+   */
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (debouncedName.trim().length > 2 && inputChanged) {
@@ -102,10 +135,13 @@ const BoxCreationForm = ({ searchQuery, onSubmit, onCancel }) => {
         setShowDropdown(false);
       }
     };
+
     fetchSuggestions();
   }, [debouncedName, inputChanged]);
 
-  // Hide the suggestions dropdown if the user clicks outside of it.
+  /**
+   * useEffect to add an event listener that closes the dropdown when clicking outside.
+   */
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -116,94 +152,90 @@ const BoxCreationForm = ({ searchQuery, onSubmit, onCancel }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Update formData for allowed editable fields.
-  const handleInputChange = (e) => {
+  /**
+   * Determines if a given field should be editable based on the current step.
+   *
+   * @param {string} fieldName - The name of the field.
+   * @returns {boolean} True if the field is editable, otherwise false.
+   */
+  const isFieldEditable = useCallback(
+    (fieldName) => {
+      if (fieldName === 'name') return true;
+      return step === Steps.CONTACT_PERSON;
+    },
+    [step]
+  );
+
+  /**
+   * Handles changes in form input fields.
+   *
+   * @param {React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>} e - The change event.
+   */
+  const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
-    if (!editableFields.includes(name)) return;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (name === 'name') {
       setInputChanged(true);
     }
     setError('');
-  };
+  }, []);
 
-  // When a suggested box is selected, populate the formData.
-  const handleBoxSelect = (box) => {
-    console.log('Selected box:', box); // For debugging purposes.
-    setFormData({
-      ...box,
-      contactName: '', // Didn't see those being sent by Google (individual contact?)
-      contactEmail: ''  // Didn't see those being sent by Google (individual contact?)
-    });
+  /**
+   * Updates the form with data from the selected box suggestion.
+   *
+   * @param {Object} box - The box object selected from suggestions.
+   */
+  const handleBoxSelect = useCallback((box) => {
+    setFormData({ ...box });
     setShowDropdown(false);
     setInputChanged(false);
-  };
+  }, []);
 
-  // Validate the data and then submit it.
-  const handleFormSubmit = async (data) => {
+  /**
+   * Validates and submits the form data.
+   *
+   * @param {React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>} e - The event triggering the submission.
+   */
+  const handleSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     try {
-      // Validate the data using your schema.
+      // Validate the required fields using the provided schema function
       const validatedData = await reqNewBoxSchema({
-        id: data.id,
-        name: data.name,
-        location: data.location,
-        lat: data.lat,
-        lng: data.lng,
-        city: data.city,
-        state: data.state,
-        country: data.country,
-        contactName: data.contactName,
-        contactEmail: data.contactEmail || null
+        id: formData.id,
+        name: formData.name,
+        location: formData.location,
+        lat: formData.lat,
+        lng: formData.lng,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        country: formData.country,
+        contactName: formData.contactName,
+        contactEmail: formData.contactEmail
       });
 
-      const boxData = {
-        boxDetails: {
-          id: validatedData.id,
-          name: validatedData.name,
-          location: validatedData.location,
-          coordinates: {
-            lat: validatedData.lat,
-            lng: validatedData.lng
-          },
-          city: validatedData.city,
-          state: validatedData.state,
-          country: validatedData.country,
-          rating: data.rating,
-          totalRatings: data.totalRatings
-        },
-        contactInfo: {
-          phone: data.phone,
-          website: data.website
-        },
-        owner: {
-          name: validatedData.contactName,
-          email: validatedData.contactEmail
-        }
-      };
-
-      await onSubmit(boxData);
+      // Update global state with the validated data and mark as successful
+      setSelectedBox(validatedData);
+      setBoxHandlerStep(HandlerSteps.SUCCESS);
       setSubtitle(null);
-      setStep(Steps.SUCCESS);
-    } catch (error) {
-      setError(error.message);
+    } catch (err) {
+      setError(err.message);
     }
   };
 
-  // Move to the next step (with a validation check on the first step).
+  /**
+   * Advances the form to the next step.
+   */
   const handleNext = () => {
     const currentIndex = stepsList.indexOf(step);
     const nextStep = stepsList[currentIndex + 1];
-
-    // On the first step, ensure an address is selected or entered.
-    if (step === Steps.ESSENTIAL && !formData.address) {
-      setError('Please select a box from the search results or enter an address.');
-      return;
-    }
     setError('');
     setStep(nextStep);
   };
 
-  // Move to the previous step.
+  /**
+   * Returns the form to the previous step.
+   */
   const handleBack = () => {
     const currentIndex = stepsList.indexOf(step);
     if (currentIndex > 0) {
@@ -212,222 +244,145 @@ const BoxCreationForm = ({ searchQuery, onSubmit, onCancel }) => {
     setError('');
   };
 
-  // When the form is submitted, if on the last data‑entry step then submit.
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (step === Steps.CONTACT_PERSON) {
-      if (formData.contactEmail && !formData.contactEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-        setError('Please enter a valid email address');
-        return;
-      }
-      handleFormSubmit(formData);
-    }
-  };
-
-  // Render the current step's content.
-  const renderStepContent = () => {
+  /**
+   * Renders the content for the current form step.
+   *
+   * @returns {JSX.Element|null} The step component corresponding to the current step.
+   */
+  const stepContent = useMemo(() => {
     switch (step) {
       case Steps.ESSENTIAL:
         return (
-          <>
-            <div className="relative">
-              <label className="block text-base sm:text-lg font-bold uppercase tracking-wider mb-2">
-                Box Name *
-              </label>
-              <input
-                type="text"
-                name="name"
-                required
-                value={formData.name}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-black/50 border-2 border-gray-800 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-red-600 text-base sm:text-lg"
-                placeholder="Enter box name to search..."
-              />
-              {showDropdown && (
-                <div className="absolute left-0 right-0 mt-2 bg-black/90 backdrop-blur-sm border border-red-600/50 rounded-lg shadow-lg overflow-hidden z-50">
-                  <div className="p-3 border-b border-gray-800">
-                    <button
-                      type="button"
-                      onClick={() => setShowDropdown(false)}
-                      className="flex items-center space-x-2 text-red-500 hover:text-red-400 transition-colors group text-base sm:text-lg w-full text-left"
-                    >
-                      <PlusCircle size={20} />
-                      <span>Create new box</span>
-                    </button>
-                  </div>
-                  <div className="max-h-60 overflow-y-auto">
-                    {suggestedBoxes.map((box) => (
-                      <button
-                        key={box.id}
-                        type="button"
-                        onClick={() => handleBoxSelect(box)}
-                        className="w-full px-4 py-3 text-left hover:bg-red-600/20 focus:bg-red-600/20 transition-colors border-b border-gray-800 last:border-0"
-                      >
-                        <div className="flex items-center">
-                          <MapPin size={18} className="shrink-0 mr-3 text-red-500" />
-                          <div>
-                            <div className="font-bold text-base sm:text-lg">{box.name}</div>
-                            <div className="text-sm text-gray-400">{box.address || box.location}</div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-base sm:text-lg font-bold uppercase tracking-wider mb-2">
-                Address
-              </label>
-              <div className="relative flex items-center">
-                <Flag code={formData.countryCode || 'US'} className="h-6 w-4 absolute left-3" />
-                <input
-                  type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  className="w-full pl-12 pr-4 py-3 bg-black/50 border-2 border-gray-800 rounded-lg text-base sm:text-lg"
-                  placeholder="Full address"
-                />
-              </div>
-            </div>
-          </>
+          <EssentialStep
+            formData={formData}
+            handleInputChange={handleInputChange}
+            showDropdown={showDropdown}
+            suggestedBoxes={suggestedBoxes}
+            handleBoxSelect={handleBoxSelect}
+            setShowDropdown={setShowDropdown}
+            dropdownRef={dropdownRef}
+            isFieldEditable={isFieldEditable}
+          />
         );
-
       case Steps.CONTACT_INFO:
         return (
-          <>
-            <div>
-              <label className="block text-base sm:text-lg font-bold uppercase tracking-wider mb-2">
-                Phone
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-black/50 border-2 border-gray-800 rounded-lg text-base sm:text-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-base sm:text-lg font-bold uppercase tracking-wider mb-2">
-                Website
-              </label>
-              <input
-                type="url"
-                name="website"
-                value={formData.website}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-black/50 border-2 border-gray-800 rounded-lg text-base sm:text-lg"
-              />
-            </div>
-          </>
+          <ContactInfoStep
+            formData={formData}
+            handleInputChange={handleInputChange}
+            isFieldEditable={isFieldEditable}
+          />
         );
-
       case Steps.CONTACT_PERSON:
         return (
-          <>
-            <div>
-              <label className="block text-base sm:text-lg font-bold uppercase tracking-wider mb-2">
-                Contact Name
-              </label>
-              <input
-                type="text"
-                name="contactName"
-                value={formData.contactName}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-black/50 border-2 border-gray-800 rounded-lg text-base sm:text-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-base sm:text-lg font-bold uppercase tracking-wider mb-2">
-                Contact Email <span className="text-gray-400 text-sm ml-2">(Optional)</span>
-              </label>
-              <input
-                type="email"
-                name="contactEmail"
-                value={formData.contactEmail}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-black/50 border-2 border-gray-800 rounded-lg text-base sm:text-lg"
-              />
-            </div>
-          </>
+          <ContactPersonStep
+            formData={formData}
+            handleInputChange={handleInputChange}
+            isFieldEditable={isFieldEditable}
+          />
         );
-
       default:
         return null;
     }
-  };
+  }, [
+    step,
+    formData,
+    handleInputChange,
+    showDropdown,
+    suggestedBoxes,
+    handleBoxSelect,
+    isFieldEditable,
+    setShowDropdown,
+    dropdownRef
+  ]);
 
   return (
     <div
       className="max-w-2xl mx-auto mt-4 backdrop-blur-sm border-2 border-red-600/50 rounded-lg p-4 sm:p-6 lg:p-8 relative"
       ref={dropdownRef}
     >
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form className="space-y-8">
+        {/* Display the step title */}
         <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wider text-center">
           {getStepTitle(step)}
         </h2>
 
+        {/* Render progress bar with the current step */}
         <ProgressBar currentStep={step} steps={Steps} />
 
-        <div className="grid grid-cols-1 gap-6">{renderStepContent()}</div>
+        {/* Render the content of the current step */}
+        <div className="grid grid-cols-1 gap-6">{stepContent}</div>
 
+        {/* Display any error messages */}
         {error && (
-          <div className="text-red-500 text-sm font-medium text-center">
-            {error}
-          </div>
+          <div className="text-red-500 text-sm font-medium text-center">{error}</div>
         )}
 
-        <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4 pt-4 border-t border-gray-800">
-          {step !== Steps.ESSENTIAL && step !== Steps.SUCCESS && (
-            <button
-              type="button"
-              onClick={handleBack}
-              className="px-6 py-3 text-base sm:text-lg font-semibold text-gray-400 hover:text-white transition-colors"
-            >
-              Back
-            </button>
-          )}
-
-          {step === Steps.ESSENTIAL && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-6 py-3 text-base sm:text-lg font-semibold text-gray-400 hover:text-white transition-colors"
-            >
-              Cancel
-            </button>
-          )}
-
-          {step === Steps.SUCCESS ? (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-6 py-3 bg-red-600 text-white text-base sm:text-lg font-semibold rounded-lg hover:bg-red-500 transition-colors"
-            >
-              Done
-            </button>
-          ) : step === Steps.CONTACT_PERSON ? (
-            <button
-              type="submit"
-              className="px-6 py-3 bg-red-600 text-white text-base sm:text-lg font-semibold rounded-lg hover:bg-red-500 transition-colors"
-            >
-              Create Box
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleNext}
-              className="px-6 py-3 bg-red-600 text-white text-base sm:text-lg font-semibold rounded-lg hover:bg-red-500 transition-colors inline-flex items-center"
-            >
-              Next
-              <ChevronRight className="ml-2 h-5 w-5" />
-            </button>
-          )}
-        </div>
+        {/* Render navigation buttons based on the current step */}
+        {(() => {
+          switch (step) {
+            case Steps.ESSENTIAL:
+              return (
+                <>
+                  <button
+                    type="button"
+                    onClick={onCancel}
+                    className="px-6 py-3 text-base sm:text-lg font-semibold text-gray-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    className="px-6 py-3 bg-red-600 text-white text-base sm:text-lg font-semibold rounded-lg hover:bg-red-500 transition-colors inline-flex items-center"
+                  >
+                    Next
+                    <ChevronRight className="ml-2 h-5 w-5" />
+                  </button>
+                </>
+              );
+            case Steps.CONTACT_INFO:
+              return (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="px-6 py-3 text-base sm:text-lg font-semibold text-gray-400 hover:text-white transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    className="px-6 py-3 bg-red-600 text-white text-base sm:text-lg font-semibold rounded-lg hover:bg-red-500 transition-colors inline-flex items-center"
+                  >
+                    Next
+                    <ChevronRight className="ml-2 h-5 w-5" />
+                  </button>
+                </>
+              );
+            case Steps.CONTACT_PERSON:
+              return (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="px-6 py-3 text-base sm:text-lg font-semibold text-gray-400 hover:text-white transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    className="px-6 py-3 bg-red-600 text-white text-base sm:text-lg font-semibold rounded-lg hover:bg-red-500 transition-colors"
+                  >
+                    Create Box
+                  </button>
+                </>
+              );
+            default:
+              return null;
+          }
+        })()}
       </form>
     </div>
   );

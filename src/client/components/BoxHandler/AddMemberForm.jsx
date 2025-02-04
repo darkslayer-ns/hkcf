@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { User, Mail, Flag, Globe, Smartphone } from 'lucide-react';
-import { Steps } from '@/client/components/BoxHandler';
-
+import { User, Mail, Globe } from 'lucide-react';
+import { HandlerSteps } from '@/client/components/BoxHandler';
 import { useGlobal } from '@/app/contexts/GlobalContext';
 import { reqNewHailraiserSchema } from '@/models/RequestModels';
+import CountrySelect from '../CountrySelect';
 
 /**
  * AddMemberForm Component
  * A form for users to join a specific "box" (e.g., a gym, community, or group) with all required fields.
+ * Automatically detects submission type based on screen width.
  *
  * @param {Object} props - Component properties.
  * @param {string} props.boxName - The name of the box the user is joining.
@@ -15,51 +16,51 @@ import { reqNewHailraiserSchema } from '@/models/RequestModels';
  * @param {function} props.onCancel - Function to handle cancel action.
  */
 const AddMemberForm = ({ boxName, onSubmit, onCancel }) => {
-  const {
-    setHellRaiser, setBoxHandlerStep
-  } = useGlobal();
+  const { setHellRaiser, setBoxHandlerStep } = useGlobal();
 
-  // Local state for each form field
+  // Local state for form fields
   const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName]   = useState('');
-  const [country, setCountry]     = useState('');
-  const [eMail, setEMail]         = useState('');
-  const [submittedBy, setSubmittedBy] = useState('Webform'); // default value
+  const [lastName, setLastName] = useState('');
+  const [country, setCountry] = useState('');
+  const [eMail, setEMail] = useState('');
   const [error, setError] = useState(null);
 
   // Handler for form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Construct the data object that matches the schema.
+    // Determine submission type based on User-Agent, thought about resolution but?!
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isTablet = /ipad|android(?!.*mobile)|tablet/i.test(userAgent) || 
+                     // Additional check for iPad with newer iOS versions
+                     (navigator.maxTouchPoints && 
+                      navigator.maxTouchPoints > 2 && 
+                      /macintosh/.test(userAgent));
+    const autoSubmissionType = isTablet ? 'Tablet' : 'Webform';
+    
+    // Construct the data object that matches the schema
     const formData = {
-      boxname: boxName, // assuming boxName is a valid safeObjectId or similar
+      boxname: boxName,
       firstName,
       lastName,
       country,
       eMail,
-      submittedBy,
-      // approved and submissionTimestamp will be set by the schema defaults
+      submittedBy: autoSubmissionType,
+      // Additional fields (approved, submissionTimestamp) can be set by the schema defaults
     };
 
     try {
-      // Validate the data using Zod schema
-      
+      // Validate the data using Zod schema (or similar)
       const validatedData = await reqNewHailraiserSchema({
         ...formData,
-        boxname: null
+        boxname: null, // modify as needed for your schema
       });
-      
-      console.log(validatedData)
 
       // Update the global state with the new validated data
       setHellRaiser(validatedData);
-      setBoxHandlerStep(Steps.CREATE_BOX)
-
+      setBoxHandlerStep(HandlerSteps.CREATE_BOX);
     } catch (validationError) {
-      console.error(validationError)
-      // Set error message(s) to display if validation fails.
-      // For simplicity, we just capture the first error message.
+      console.error(validationError);
       if (validationError.errors && validationError.errors.length > 0) {
         setError(validationError.errors[0].message);
       } else {
@@ -71,7 +72,6 @@ const AddMemberForm = ({ boxName, onSubmit, onCancel }) => {
   return (
     <div className="mt-4 backdrop-blur-sm border-2 border-red-600/50 rounded-lg p-8">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Form title dynamically displays the box name */}
         <h2 className="text-3xl font-black uppercase tracking-wider mb-8 text-center">
           Join {boxName}
         </h2>
@@ -112,19 +112,10 @@ const AddMemberForm = ({ boxName, onSubmit, onCancel }) => {
           />
         </div>
 
-        {/* Country Input Field */}
+        {/* Country Dropdown Field */}
         <div className="relative">
           <Globe className="absolute left-4 top-4 text-gray-500" size={20} />
-          <input
-            type="text"
-            name="country"
-            value={country}
-            onChange={(e) => setCountry(e.target.value)}
-            required
-            placeholder="Country *"
-            className="w-full pl-12 pr-4 py-3 bg-black/50 border-2 border-gray-800 rounded-lg 
-                       focus:ring-2 focus:ring-red-600 focus:border-red-600 text-lg"
-          />
+          <CountrySelect value={country} onChange={setCountry} />
         </div>
 
         {/* Email Input Field */}
@@ -140,22 +131,6 @@ const AddMemberForm = ({ boxName, onSubmit, onCancel }) => {
             className="w-full pl-12 pr-4 py-3 bg-black/50 border-2 border-gray-800 rounded-lg 
                        focus:ring-2 focus:ring-red-600 focus:border-red-600 text-lg"
           />
-        </div>
-
-        {/* Submitted By: Selection Field */}
-        <div className="relative">
-          <Smartphone className="absolute left-4 top-4 text-gray-500" size={20} />
-          <select
-            name="submittedBy"
-            value={submittedBy}
-            onChange={(e) => setSubmittedBy(e.target.value)}
-            required
-            className="w-full pl-12 pr-4 py-3 bg-black/50 border-2 border-gray-800 rounded-lg 
-                       focus:ring-2 focus:ring-red-600 focus:border-red-600 text-lg"
-          >
-            <option value="Tablet">Tablet</option>
-            <option value="Webform">Webform</option>
-          </select>
         </div>
 
         {/* Action Buttons: Submit & Cancel */}
