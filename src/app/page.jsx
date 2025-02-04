@@ -18,16 +18,33 @@ export default function Home() {
 
   return (
     <GlobalProvider>
-      <div className="fixed top-0 left-0 w-full h-full -z-10">
-        <video autoPlay loop muted className="w-full h-full object-cover">
-          <source src="weights.mp4" type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-        <div className="absolute inset-0 bg-black/70"></div>
+      {/* Wrapper to contain both video and content */}
+      <div className="relative min-h-screen">
+        {/* Video background container */}
+        <div className="fixed inset-0 -z-10 overflow-hidden">
+          <video 
+            autoPlay 
+            loop 
+            muted 
+            playsInline
+            disablePictureInPicture
+            controls={false}
+            className="absolute w-full h-full object-cover"
+          >
+            <source src="weights.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-black/70 pointer-events-none"></div>
+        </div>
+
+        {/* Main content */}
+        <div className="relative z-10">
+          <Layout className="border-4 border-gray-300">
+            <HomePage />
+          </Layout>
+        </div>
       </div>
-      <Layout className="border-4 border-gray-300">
-        <HomePage />
-      </Layout>
     </GlobalProvider>
   );
 }
