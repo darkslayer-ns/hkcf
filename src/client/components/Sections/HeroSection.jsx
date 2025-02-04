@@ -19,7 +19,7 @@ export default function HeroSection() {
             {subtitle}
           </p>
           
-          <div className="bg-gradient-to-b from-black/60 to-black/90 backdrop-blur-sm border-2 border-cfhk-red/50 rounded-lg p-6 md:p-8 w-full max-w-xl mx-auto shadow-lg">
+          <div className="w-full max-w-xl mx-auto">
             <BoxHandler />
           </div>
         </div>
