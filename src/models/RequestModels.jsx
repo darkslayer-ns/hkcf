@@ -121,7 +121,6 @@ export const reqNewHailraiserSchema = async (input) => {
   const schema = z.object({
     id: z.string().optional().nullable(),
     boxId: z.string().optional().nullable(),
-    box: boxNameString.optional(),  // The box name field (optional when creating new box)
     firstName: safeString.transform(val => val?.trim()),
     lastName: safeString.transform(val => val?.trim()),
     country: safeString.transform(val => val?.trim()),

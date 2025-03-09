@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { searchBoxesGoogle } from '@/ssr/Google/searchBoxes';
 import { ChevronRight } from 'lucide-react';
-import { searchBoxes, createBox, addHailraiser } from '@/ssr/db/actions';
-
-import { db } from '@/firebase/config';
+import {createBox, addHailraiser } from '@/ssr/db/actions';
 
 // Importing step components
 import EssentialStep from '@/client/components/BoxCreationSteps/EssentialStep';
@@ -244,11 +242,11 @@ const BoxCreationForm = ({ searchQuery, onCancel }) => {
       });
 
       // Add the current hellRaiser to the box if available
-      if (hellRaiser?.name) {
+      console.log(hellRaiser);
+      if (hellRaiser?.firstName) {
         await addHailraiser({
-          boxId: boxData.id,
-          name: hellRaiser.name,
-          email: hellRaiser.email
+          ...hellRaiser,
+          boxId: boxData.id
         });
       }
 

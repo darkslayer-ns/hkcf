@@ -344,7 +344,6 @@ const BoxHandlerContent = ({
       {/* Step 2: Add Hell Raiser Name & Email */}
       {boxHandlerStep === HandlerSteps.ADD_HAILRAISER && (
         <AddMemberForm
-          boxName={selectedBox ? selectedBox.name : "New Box"}
           boxId={selectedBox ? selectedBox.id : null}
           onSubmit={handleHailRaiserSubmit}
           onCancel={boxHandlerStep === HandlerSteps.ADD_HAILRAISER ? handleExit : handleReset}

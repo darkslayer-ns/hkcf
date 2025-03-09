@@ -11,11 +11,10 @@ import { useGlobal } from '@/app/contexts/GlobalContext';
  * Automatically detects submission type based on screen width.
  *
  * @param {Object} props - Component properties.
- * @param {string} props.boxName - The name of the box the user is joining.
- * @param {function} props.onSubmit - Async function to handle form submission. Receives validated hailraiser data.
+ * @param {string} props.boxName - The name of the box the user is joining * @param {function} props.onSubmit - Async function to handle form submission. Receives validated hailraiser data.
  * @param {function} props.onCancel - Function to handle cancel action.
  */
-const AddMemberForm = ({ boxName, boxId, onSubmit, onCancel }) => {
+const AddMemberForm = ({ boxId, onSubmit, onCancel }) => {
   const { setHellRaiser } = useGlobal(); // Get global context
 
   // Local state for form fields
@@ -92,7 +91,6 @@ const AddMemberForm = ({ boxName, boxId, onSubmit, onCancel }) => {
     
     // Construct the data object that matches the schema
     const formData = {
-      box: boxName,  // Use box field instead of boxName to match schema
       boxId,
       firstName,
       lastName,
