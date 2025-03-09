@@ -12,7 +12,15 @@ import { Search, MapPin, PlusCircle } from 'lucide-react';
  * @param {function} props.onBoxSelect - Callback function when a box is selected.
  * @param {function} props.onAddNewBox - Callback function to add a new box if not found.
  */
-const BoxSearchInput = ({ searchQuery, setSearchQuery, filteredBoxes, onBoxSelect, onAddNewBox }) => {
+const BoxSearchInput = ({ 
+  searchQuery, 
+  setSearchQuery, 
+  filteredBoxes = [], 
+  onBoxSelect, 
+  onAddNewBox, 
+  isLoading = false,
+  error = null
+}) => {
   const dropdownRef = useRef(null);
 
   /**
@@ -54,47 +62,52 @@ const BoxSearchInput = ({ searchQuery, setSearchQuery, filteredBoxes, onBoxSelec
         <div className="absolute left-0 right-0 mt-2 bg-black/90 backdrop-blur-sm border border-red-600/50 
                         rounded-lg shadow-lg overflow-hidden">
           
-          {/* Add New Box Button */}
-          <div className="p-4 border-b border-gray-800">
-            <button
-              onClick={onAddNewBox}
-              className="flex items-center space-x-2 text-red-500 hover:text-red-400 transition-colors 
-                         group text-lg w-full text-left"
-            >
-              <PlusCircle size={24} />
-              <span>Add your box!</span>
-            </button>
-          </div>
-
-          {/* Render filtered box list if available */}
-          {filteredBoxes.length > 0 ? (
-            <div className="max-h-60 overflow-y-auto">
-              {filteredBoxes.map((box) => {
-                return (
-                  <button
-                    key={box.id}
-                    onClick={() => onBoxSelect(box)}
-                    className="w-full px-6 py-4 text-left hover:bg-red-600/20 focus:bg-red-600/20 
-                               transition-colors border-b border-gray-800 last:border-0"
-                  >
-                    <div className="flex items-center">
-                      {/* Location Pin Icon */}
-                      <MapPin size={20} className="mr-3 text-red-500" />
-                      
-                      <div>
-                        <div className="font-bold text-lg">{box.name}</div>
-                        <div className="text-gray-400">{box.location}</div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+          {/* Loading State */}
+          {isLoading ? (
+            <div className="p-6 text-gray-400 text-lg flex items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-red-500 mr-3"></div>
+              <span>Searching...</span>
             </div>
           ) : (
-            /* Message when no matching boxes are found */
-            <div className="p-6 text-gray-400 text-lg">
-              No boxes found matching "{searchQuery}"
-            </div>
+            <>
+              {/* Add New Box Button */}
+              <div className="p-4 border-b border-gray-800">
+                <button
+                  onClick={onAddNewBox}
+                  className="flex items-center space-x-2 text-red-500 hover:text-red-400 transition-colors 
+                             group text-lg w-full text-left"
+                >
+                  <PlusCircle size={24} />
+                  <span>Add your box!</span>
+                </button>
+              </div>
+
+              {/* Render filtered box list if available */}
+              {filteredBoxes.length > 0 ? (
+                <div className="max-h-60 overflow-y-auto">
+                  {filteredBoxes.map((box) => (
+                    <button
+                      key={box.id}
+                      onClick={() => onBoxSelect(box)}
+                      className="w-full px-6 py-4 text-left hover:bg-red-600/20 focus:bg-red-600/20 
+                                 transition-colors border-b border-gray-800 last:border-0"
+                    >
+                      <div className="flex items-center">
+                        <MapPin size={20} className="mr-3 text-red-500" />
+                        <div>
+                          <div className="font-bold text-lg">{box.name}</div>
+                          <div className="text-gray-400">{box.location}</div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 text-gray-400 text-lg">
+                  No boxes found matching "{searchQuery}"
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

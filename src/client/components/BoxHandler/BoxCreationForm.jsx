@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { searchBoxesGoogle } from '@/ssr/Google/searchBoxes';
 import { ChevronRight } from 'lucide-react';
+import { searchBoxes, createBox, addHailraiser } from '@/ssr/db/actions';
+
+import { db } from '@/firebase/config';
 
 // Importing step components
 import EssentialStep from '@/client/components/BoxCreationSteps/EssentialStep';
@@ -53,8 +56,8 @@ const getStepTitle = (step) => {
  * @returns {JSX.Element} The rendered BoxCreationForm component.
  */
 const BoxCreationForm = ({ searchQuery, onCancel }) => {
-  // Global state setters from context
-  const { setSubtitle, setSelectedBox, setBoxHandlerStep } = useGlobal();
+  // Global state from context
+  const { setSubtitle, setSelectedBox, setBoxHandlerStep, hellRaiser } = useGlobal();
 
   // Local state variables for form step, input changes, suggestions, dropdown visibility, and errors
   const [step, setStep] = useState(Steps.ESSENTIAL);
@@ -62,6 +65,7 @@ const BoxCreationForm = ({ searchQuery, onCancel }) => {
   const [suggestedBoxes, setSuggestedBoxes] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Ref for the dropdown element to detect clicks outside of it
   const dropdownRef = useRef(null);
@@ -196,13 +200,38 @@ const BoxCreationForm = ({ searchQuery, onCancel }) => {
    *
    * @param {React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>} e - The event triggering the submission.
    */
+  const validateBoxName = (name) => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      throw new Error('Box name is required');
+    }
+    if (trimmed.length < 3) {
+      throw new Error('Box name must be at least 3 characters long');
+    }
+    if (trimmed.length > 50) {
+      throw new Error('Box name must be less than 50 characters long');
+    }
+    if (!/^[a-zA-Z0-9\s\-\.,']+$/.test(trimmed)) {
+      throw new Error('Box name can only contain letters, numbers, spaces, and basic punctuation');
+    }
+    return trimmed;
+  };
+
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
+    setError('');
+    
     try {
-      // Validate the required fields using the provided schema function
-      const validatedData = await reqNewBoxSchema({
-        id: formData.id,
-        name: formData.name,
+      // Validate and normalize the box name
+      const validatedName = validateBoxName(formData.name);
+      const normalizedName = validatedName.toLowerCase();
+
+      // Create the box using the createBox action
+      const boxData = await createBox({
+        name: formData.name.trim(),
         location: formData.location,
         lat: formData.lat,
         lng: formData.lng,
@@ -214,12 +243,32 @@ const BoxCreationForm = ({ searchQuery, onCancel }) => {
         contactEmail: formData.contactEmail
       });
 
+      // Add the current hellRaiser to the box if available
+      if (hellRaiser?.name) {
+        await addHailraiser({
+          boxId: boxData.id,
+          name: hellRaiser.name,
+          email: hellRaiser.email
+        });
+      }
+
       // Update global state with the validated data and mark as successful
-      setSelectedBox(validatedData);
+      setSelectedBox(boxData);
       setBoxHandlerStep(HandlerSteps.SUCCESS);
       setSubtitle(null);
     } catch (err) {
-      setError(err.message);
+      console.error('Error creating box:', err);
+      let errorMessage = err.message;
+      
+      if (err.code === 'permission-denied') {
+        errorMessage = 'You do not have permission to create a box';
+      } else if (!err.message?.includes('already exists') && !err.message?.includes('Box name')) {
+        errorMessage = 'Failed to create box. Please try again.';
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -373,9 +422,10 @@ const BoxCreationForm = ({ searchQuery, onCancel }) => {
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    className="px-6 py-3 bg-red-600 text-white text-base sm:text-lg font-semibold rounded-lg hover:bg-red-500 transition-colors"
+                    disabled={isSubmitting}
+                    className={`px-6 py-3 text-white text-base sm:text-lg font-semibold rounded-lg transition-colors ${isSubmitting ? 'bg-red-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500'}`}
                   >
-                    Create Box
+                    {isSubmitting ? 'Creating...' : 'Create Box'}
                   </button>
                 </>
               );
