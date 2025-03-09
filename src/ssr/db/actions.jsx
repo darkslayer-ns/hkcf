@@ -25,15 +25,28 @@ export async function createBox(boxData) {
     // Validate the box data using schema
     const validatedData = await reqNewBoxSchema(boxData);
 
-    // Normalize the box name and generate search keywords
+    // Normalize the box name, city, and country for search keywords
     const normalizedName = validatedData.name
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, ''); // Only allow lowercase alphanumeric and spaces
     
-    // Generate normalized search keywords from the name
-    const searchKeywords = normalizedName
-      .split(/\s+/)
+    const normalizedCity = validatedData.city
+      ?.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '') || '';
+
+    const normalizedCountry = validatedData.country
+      ?.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '') || '';
+    
+    // Generate normalized search keywords from name, city, and country
+    const searchKeywords = [
+      ...normalizedName.split(/\s+/),
+      ...normalizedCity.split(/\s+/),
+      ...normalizedCountry.split(/\s+/)
+    ]
       .filter(Boolean)
       .map(keyword => keyword.toLowerCase().replace(/[^a-z0-9]/g, '')); // Normalize each keyword
     
@@ -180,7 +193,7 @@ export async function searchBoxes(searchQuery) {
       return { results: [] };
     }
 
-    // Process and filter results
+    // Process and filter results 
     const boxes = [];
     snapshot.forEach(doc => {
       const data = doc.data();
