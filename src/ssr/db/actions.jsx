@@ -58,8 +58,7 @@ export async function createBox(boxData) {
       createdAt: timestamp,
       updatedAt: timestamp,
       submittedAt: timestamp,
-      searchKeywords,
-      members: [] // Initialize empty members array
+      searchKeywords
     };
 
     // Save to database
@@ -124,13 +123,6 @@ export async function addHailraiser(hailraiserData) {
     if (existingHailraiser.exists) {
       throw new Error('A hailraiser with this ID already exists');
     }
-
-    // Add hailraiser to the box's members array
-    const app = await getApp();
-    await boxRef.update({
-      members: app.firestore.FieldValue?.arrayUnion(hailraiserId),
-      updatedAt: timestamp
-    });
 
     // Save hailraiser data
     await hailraiserRef.set(finalHailraiserData);
