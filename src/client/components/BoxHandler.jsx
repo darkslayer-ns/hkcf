@@ -7,11 +7,12 @@ import React, { useState, useEffect, useRef, Component } from 'react';
 import BoxSearchInput from './BoxHandler/BoxSearchInput';
 import BoxCreationForm from './BoxHandler/BoxCreationForm';
 import AddMemberForm from './BoxHandler/AddMemberForm';
+import HellraiserList from './BoxHandler/HellraiserList';
 import SuccessMessage from './BoxHandler/SuccessMessage';
 
 // Server actions
 import { searchBoxes } from '@/ssr/db/searchBoxes';
-import { addHailraiser } from '@/ssr/db/actions';
+import { addHailraiser, getBoxHellraisers } from '@/ssr/db/actions';
 
 // Hooks and context
 import useDebounce from '@/client/hooks/useDebounce';
@@ -78,10 +79,11 @@ class ErrorBoundary extends Component {
  */
 export const HandlerSteps = Object.freeze({
   SEARCH: 'search',            // Step 1: Search for a Box
-  ADD_HAILRAISER: 'addHailRaiser', // Step 2: Capture Hell Raiser Name & Email (if no box found)
-  CREATE_BOX: 'createBox',      // Step 3: Create a new Box
-  JOIN_BOX: 'joinBox',          // Step 4: Add user to existing Box
-  SUCCESS: 'success',           // Step 5: Success message after joining or creating
+  LIST_HELLRAISERS: 'listHellraisers', // Step 2: List existing hellraisers if box exists
+  ADD_HAILRAISER: 'addHailRaiser', // Step 3: Capture Hell Raiser Name & Email
+  CREATE_BOX: 'createBox',      // Step 4: Create a new Box
+  JOIN_BOX: 'joinBox',          // Step 5: Add user to existing Box
+  SUCCESS: 'success',           // Step 6: Success message after joining or creating
   EXIT: 'exit'                  // Exit if user chooses not to continue
 });
 
@@ -118,6 +120,8 @@ const BoxHandlerContent = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [boxHellraisers, setBoxHellraisers] = useState([]);
+  const [isLoadingHellraisers, setIsLoadingHellraisers] = useState(false);
 
   // Reset error state when query changes
   useEffect(() => {
@@ -227,11 +231,24 @@ const BoxHandlerContent = ({
   /**
    * Handles the selection of a box from search results
    */
-  const handleBoxSelect = (box) => {
+  const handleBoxSelect = async (box) => {
     setSelectedBox(box);
     setSearchQuery(box.name);
-    setBoxHandlerStep(HandlerSteps.ADD_HAILRAISER);
-    onBoxSelected(box);
+    setIsLoadingHellraisers(true);
+    setSearchError(null);
+
+    try {
+      const hellraisers = await getBoxHellraisers(box.id);
+      setBoxHellraisers(hellraisers);
+      setBoxHandlerStep(HandlerSteps.LIST_HELLRAISERS);
+      onBoxSelected(box);
+    } catch (error) {
+      console.error('Error fetching hellraisers:', error);
+      setSearchError('Failed to fetch hellraisers. Please try again.');
+      setBoxHandlerStep(HandlerSteps.SEARCH);
+    } finally {
+      setIsLoadingHellraisers(false);
+    }
   };
 
   /**
@@ -341,7 +358,17 @@ const BoxHandlerContent = ({
         />
       )}
 
-      {/* Step 2: Add Hell Raiser Name & Email */}
+      {/* Step 2: List Hellraisers */}
+      {boxHandlerStep === HandlerSteps.LIST_HELLRAISERS && selectedBox && (
+        <HellraiserList
+          hellraisers={boxHellraisers}
+          onAddNew={() => setBoxHandlerStep(HandlerSteps.ADD_HAILRAISER)}
+          onCancel={handleReset}
+          isLoading={isLoadingHellraisers}
+        />
+      )}
+
+      {/* Step 3: Add Hell Raiser Name & Email */}
       {boxHandlerStep === HandlerSteps.ADD_HAILRAISER && (
         <AddMemberForm
           boxName={selectedBox ? selectedBox.name : "New Box"}

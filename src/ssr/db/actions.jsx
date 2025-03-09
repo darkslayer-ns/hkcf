@@ -147,6 +147,47 @@ export async function addHailraiser(hailraiserData) {
   }
 }
 
+/**
+ * Fetches all hellraisers for a specific box
+ * @param {string} boxId - The ID of the box to fetch hellraisers for
+ * @returns {Promise<Array>} List of hellraisers
+ */
+export async function getBoxHellraisers(boxId) {
+  try {
+    // Get Firestore instance first to fail fast if DB is unavailable
+    const db = await getFirestore();
+    if (!db) {
+      throw new Error('Database connection error');
+    }
+
+    // Check if the box exists
+    const boxRef = db.collection('boxes').doc(boxId);
+    const boxDoc = await boxRef.get();
+    if (!boxDoc.exists) {
+      throw new Error('Box not found');
+    }
+
+    // Query hellraisers for this box
+    const hailraisersRef = db.collection('hailraisers');
+    const snapshot = await hailraisersRef.where('boxId', '==', boxId).get();
+
+    const hellraisers = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      hellraisers.push({
+        id: data.id,
+        firstName: data.firstName,
+        lastName: data.lastName
+      });
+    });
+
+    return hellraisers;
+  } catch (error) {
+    console.error('Error fetching hellraisers:', error);
+    throw error;
+  }
+}
+
 export async function searchBoxes(searchQuery) {
   // Validate searchQuery
   if (typeof searchQuery !== 'string') {
